@@ -52,7 +52,7 @@ For the experiments, instances are **generated** (random points, synthetic conge
 ## C2.2 Derived data
 - **Travel time** $\tau_a(t)$ from the speeds, with speed changes when a breakpoint is crossed (Ichoua et al., 2003). Beyond $T$ the last slot's speed applies.
 - **Customer graph** $H=(N,E)$, $N=C\cup\{0\}$, with $\tau_{ij}(t)$ obtained by time-dependent shortest paths on $G$.
-- **Discrete data** for the ILP: step $\delta$, time indices, $\theta_{ij}(t)$ (see the notation sheet S4).
+- **Slot travel times** for the ILP: $\tau^{s}_{ij}$, the travel time from $i$ to $j$ when leaving during slot $s$, computed with the slot-$s$ speeds (see the notation sheet S4, section 6). The ILP uses this simpler *departure-slot* rule, which keeps the model linear; the exact Ichoua model above will be used by the heuristic and to evaluate its routes.
 
 ## C2.3 Assumptions
 | # | Assumption | Justification / consequence |
@@ -65,10 +65,10 @@ For the experiments, instances are **generated** (random points, synthetic conge
 | A6 | Speeds are piecewise constant per slot and the travel time follows the model of Ichoua et al., so the **FIFO** property holds | avoids unrealistic "leave later, arrive earlier" |
 | A7 | Trucks may pass through other nodes without serving them | the customer graph uses shortest paths |
 | A8 | A truck may wait at a customer if it arrives before the window opens; service must **start** within $[a_i,b_i]$ | usual convention for time windows |
-| A9 | Departure time from the depot is free in $[0,T]$ and waiting at the depot is not counted in the duration | the objective measures time on the road + service + waiting at customers |
+| A9 | All trucks leave the depot at time $0$ | the duration of a route is its return time, which keeps the ILP simple; a free departure time (not counting waiting at the depot) is a planned refinement |
 | A10 | Objective: sum over trucks of (return time $-$ departure time) | matches "minimize the total duration of the route" |
 | A11 | All routes must be completed before $T$ | finite horizon |
-| A12 | Time is discretized with step $\delta$ in the ILP; arrival times are rounded up | the ILP is then an upper bound of the true optimum |
+| A12 | In the ILP, the travel time of a trip is fixed by the slot in which the truck leaves ($\tau^{s}_{ij}$) | keeps the ILP linear; it approximates the exact Ichoua travel time, which the heuristic will use |
 | A13 | A route has no maximum duration and drivers have no break constraints | possible future extension |
 | A14 | Single speed profile for all vehicle types (no emission model yet) | possible future extension |
 
@@ -80,7 +80,8 @@ For the experiments, instances are **generated** (random points, synthetic conge
 5. Window feasibility (necessary condition): each customer must be reachable in time, i.e. $\alpha_{0i}(0)\le b_i$, and the depot must be reachable again before $T$ after serving it, i.e. $\max(a_i,\alpha_{0i}(0))+s_i+\tau_{i0}(\cdot)\le T$.
 
 ## C2.5 Open questions to settle with the team and tutor
-- Final choice of $K$, $T$ and $\delta$ (precision versus size of the ILP).
+- Final choice of $K$ and $T$.
+- Free departure time from the depot (A9) and exact Ichoua travel times inside the ILP (A12): worth the extra model complexity for the final deliverable?
 - Real traffic data or synthetic profiles for the experiments?
 - Keep the objective as total duration only, or add a vehicle fixed cost?
 - Confirm that both added constraints (time windows and service times) are kept in the final scope.

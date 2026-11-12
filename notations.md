@@ -3,10 +3,10 @@
 *Single reference for all team members: every notebook section, the ILP and the code must use exactly these symbols.*
 
 ## 1. Conventions
-- Sets: calligraphic or capital letters ($V, A, C, N, \mathcal T, \mathcal A$). Parameters: lowercase/Latin ($q_i, s_i, d_a$). Decision variables: $x, y, f, g$.
-- Node `0` is always the depot. Customers are `1..n`.
+- Sets: capital letters ($V, A, C, N, N^{+}$). Parameters: lowercase/Latin ($q_i, s_i, d_a$). Decision variables: $x, z, r, u, t, L, f$.
+- Node `0` is always the depot. Customers are `1..n`. In the ILP, node `n+1` is a copy of the depot used as the end of a route.
 - Time unit: **minute**. Distance unit: **km**. Speed unit: **km/min**. Demand unit: **parcel units** (or kg, to be fixed per instance).
-- Continuous time is written $t$ (minutes); discretized time is an integer index $t\in\{0,\dots,H\}$ meaning the instant $t\delta$. Always say which one is used.
+- A generic instant is written $t$ (minutes), as in $\tau_a(t)$. With a customer index, $t_i$ is the departure-time variable of the ILP.
 - Python variable names are given in the last column of each table so code and maths stay aligned.
 
 ## 2. Road network and traffic
@@ -49,27 +49,30 @@
 |---|---|
 | $r\le k$ | number of routes used |
 | $R_\ell=(0,i^\ell_1,\dots,i^\ell_{m_\ell},0)$ | route $\ell$, with $m_\ell$ customers |
-| $t_0^\ell$ | departure time of route $\ell$ from the depot (decision) |
+| $t_0^\ell$ | departure time of route $\ell$ from the depot (fixed to $0$ in the current ILP, see A9; a free departure time is a planned refinement) |
 | $u_p^\ell$ | start of service of the $p$-th customer of route $\ell$ |
 | $u^\ell_{m_\ell+1}$ | return time to the depot |
 | $D(R_\ell)=u^\ell_{m_\ell+1}-t_0^\ell$ | duration of route $\ell$ |
 | **Objective** | $\min\sum_{\ell=1}^r D(R_\ell)$ |
 
-## 6. ILP (time-expanded formulation)
-| Symbol | Meaning |
-|---|---|
-| $\delta$ | time step (min) |
-| $H=\lfloor T/\delta\rfloor$ | last time index (**rename to** $H_{\max}$ **if confusion with graph** $H$; see note below) |
-| $\mathcal T=\{0,\dots,H\}$ | time indices |
-| $\bar a_i,\bar b_i,\bar s_i$ | window and service time in steps ($\lceil a_i/\delta\rceil$, $\lfloor b_i/\delta\rfloor$, $\lceil s_i/\delta\rceil$) |
-| $\theta_{ij}(t)=\bar s_i+\lceil\tau_{ij}((t+\bar s_i)\delta)/\delta\rceil$ | steps between start of service at $i$ (step $t$) and arrival at $j$ |
-| $\mathcal A$ | set of valid time-expanded arcs $(i,j,t)$ |
-| $x_{ij}^t\in\{0,1\}$ | a truck starts service at $i$ at step $t$ then goes to $j$ |
-| $y_i^t\in\{0,1\}$ | a truck waits at $i$ from step $t$ to $t+1$ |
-| $f_{ij}^t\ge0$ | load on board on arc $x_{ij}^t$ |
-| $g_i^t\ge0$ | load on board while waiting at $i$ during $[t,t+1]$ |
+## 6. ILP (slot-based formulation, `ILP Models/ILP_model.md`)
+| Symbol | Meaning | Python |
+|---|---|---|
+| $n+1$ | copy of the depot, end of a route | `n + 1` |
+| $N^{+}=C\cup\{n+1\}$ | possible destinations of an arc (origins are $N$) | `N_plus` |
+| $\tau^{s}_{ij}$ | travel time from $i$ to $j$ when leaving $i$ during slot $s$ (shortest path in $G$ with slot-$s$ speeds); $\tau^{s}_{i,n+1}=\tau^{s}_{i0}$ | `tau_slot[i][j][s]` |
+| $\varepsilon$ | time resolution making slots half-open | `eps` |
+| $M_{ij}$, $M_i$ | big-M constants, $T+\max_s\tau^{s}_{ij}$ and $T+\max_s\tau^{s}_{i0}$ | `M[i][j]`, `M_ret[i]` |
+| $x_{ij}\in\{0,1\}$ | a truck drives directly from $i\in N$ to $j\in N^{+}$ | `x[i, j]` |
+| $z^{s}_{i}\in\{0,1\}$ | the truck leaves $i$ during slot $s$ | `z[i, s]` |
+| $r_i\ge0$ | arrival time at $i$ | `r[i]` |
+| $u_i\in[a_i,b_i]$ | start of service at $i$ | `u[i]` |
+| $t_i\in[0,T)$ | departure time from $i$ | `t[i]` |
+| $w_i=u_i-r_i$ | waiting time at $i$ (derived, not a variable) | – |
+| $L_i\in[q_i,Q]$ | cumulative load delivered up to and including $i$ | `L[i]` |
+| $f_i\in[0,T]$ | return time to the depot if $i$ is the last customer of its route, else $0$ | `f[i]` |
 
-> **Note on collisions:** the symbol $H$ is used both for the customer graph and the last time index. Decision for the team: **use $H=(N,E)$ for the graph and $L=\lfloor T/\delta\rfloor$ for the last time index** in the final version (the current notebook still uses $H$ for both; fix in the next revision). Likewise $s$ is the slot index *and* $s_i$ the service time; slots are always written as a superscript ($v_a^{s}$), service times always carry a customer index.
+> **Note on collisions:** $H=(N,E)$ is only the customer graph (the time-expanded formulation, which also used $H$ as a time index, was dropped). $A$ is the arc set of $G$ and $d_a$ an arc length, so the ILP uses $r_i$ for arrival and $t_i$ for departure. $s$ is the slot index *and* $s_i$ the service time; slots are always written as a superscript ($v_a^{s}$, $\tau^{s}_{ij}$, $z^{s}_{i}$), service times always carry a customer index as a subscript.
 
 ## 7. Complexity vocabulary
 | Symbol | Meaning |
@@ -78,6 +81,8 @@
 | $A\le_p B$ | polynomial-time reduction from $A$ to $B$ |
 | HC | Hamiltonian Cycle |
 | TSP, CVRP, VRPTW | travelling salesman, capacitated VRP, VRP with time windows |
+| $\Delta$-TSP-D | decision TSP whose costs satisfy the triangle inequality |
+| BP-D | decision Bin Packing |
 | TD-CVRP | basic version (no time windows, no service times) |
 | TD-CVRP-TW | full problem with time windows and service times |
 | TD-CVRP-TW-D | decision version (is there a solution of duration $\le B$?) |
